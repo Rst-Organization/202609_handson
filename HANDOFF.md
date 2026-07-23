@@ -96,6 +96,19 @@ Claude Code が自動読み込みするのは `CLAUDE.md` 系。
 → `doctor.sh` はこれを1段目に使う。モデル名変更で診断が壊れない。
 → 2段目のフォールバックとして `/v1/messages` も残してある。
 
+### 2-6. Claude Code は Node.js 22 以上を要求する（2026-07-23 追記）
+
+`@anthropic-ai/claude-code`（検証時 2.1.218）は `engines.node >= 22` を要求する。
+Node 20 の環境では `npm install` 時に **EBADENGINE 警告**が出る
+（インストール自体は通り `claude --version` も動くが、将来のバージョンで
+ハード失敗する余地が残る）。
+
+→ devcontainer の `image` を、当初の `universal:2`（既定 Node が 20）から
+  **Node 22 を確定的に積む** `mcr.microsoft.com/devcontainers/javascript-node:1-22` に変更した。
+→ `universal:2` の tag 自体は有効・pull 可能（後述 6 のローカル検証で確認済み）。
+  不採用の理由は Node バージョンのみ。
+→ イメージを差し替える場合も **Node 22 未満には落とさないこと**。
+
 ---
 
 ## 3. キー運用モデル
@@ -191,21 +204,33 @@ README.md              参加者向け。3ステップのセットアップ手�
 - テスト: 14件中13パス、意図的な1件のみ失敗
 - リポジトリ全体を走査し、キー文字列の混入ゼロ
 
-### 未検証（Codespaces 上での実地確認が未実施）
+### 追加検証済み（2026-07-23 ローカル Docker 実行）
 
-**ここが唯一の残リスクです。**
+`javascript-node:1-22`（Node 22）および `node:20` の実コンテナで通し確認済み:
 
-- イメージ `mcr.microsoft.com/devcontainers/universal:2` が実際に引けるか
-- Codespaces 上で `onCreateCommand` が期待通り動くか
-- 実際の `$HOME` のパス
-- `claude` の対話TUIが起動するか（`--version` しか確認していない）
-- 有効なキーでの 200 応答（401 の経路しか確認していない）
+- `.devcontainer/bootstrap.sh` が **exit 0** で完走し `claude 2.1.218` を導入
+- claude が PATH に乗る（3経路）／ PATH ブロックが3つの rc に永続化
+- `setup-key.sh` の冪等性（2回実行しても `ANTHROPIC_API_KEY` 行は1つのまま）
+- `doctor.sh` が **実 API に対して HTTP 401 を検出**（401 経路を実機確認）
+- `npm test` が 13 pass / 1 fail、サーバーが 201 / 400 / 404
+- `universal:2` と `javascript-node:1-22` の **イメージタグが pull 可能**（`docker manifest inspect`）
+- Node 20 では EBADENGINE 警告、Node 22 では警告消滅 → イメージを Node 22 系に変更（2-6）
 
-落ちるとすれば**ほぼイメージタグ**です。他の指定を削ってあるため
-切り分けは容易。落ちた場合の代替は `devcontainer.json` のコメントに記載:
+### 未検証（実 Codespaces 上でのみ確認可能）
 
-- `mcr.microsoft.com/devcontainers/universal:linux`（ローリング最新）
-- `mcr.microsoft.com/devcontainers/javascript-node:1-20`（軽量・Nodeのみ）
+- Codespaces のエージェントが `onCreateCommand` を期待どおり呼ぶか（ローカルでは手動実行で確認済み）
+- Prebuild 有効時の挙動
+- `claude` 対話TUIの起動（`--version` までは確認）
+- **有効なキーでの 200 応答**（本物のセミナーキーが要る。運営が事前チェックで確認：operator-guide 4）
+
+> 実 Codespaces 検証には `gh` の `codespace` スコープが必要だが、Org の OAuth アプリ制限で
+> 未取得（`gh auth refresh -s codespace` が反映されない）。スコープ取得後に `gh codespace` で通せる。
+> それまでは上記のローカル検証＋運営の実キー事前チェックで代替する。
+
+落ちた場合の代替イメージ（**Node 22 未満に落とさないこと**）:
+
+- `mcr.microsoft.com/devcontainers/javascript-node:22`（同等・タグ違い）
+- `mcr.microsoft.com/devcontainers/typescript-node:1-22`（同等＋TypeScript同梱）
 
 ---
 
@@ -214,7 +239,9 @@ README.md              参加者向け。3ステップのセットアップ手�
 ### 必須
 
 1. **Codespace を実際に作って通しで検証する**
-   （`docs/operator-guide.md` の「事前検証チェックリスト」を上から潰す）
+   （ローカル Docker では検証済み＝上記 6 を参照。実 Codespaces は `gh` の codespace
+   スコープ取得後、または運営が手動で `docs/operator-guide.md` の
+   「事前検証チェックリスト」を上から潰す）
 2. **Prebuild を有効化する**
    Settings → Codespaces → Set up prebuild
    `onCreateCommand`（= `npm install`）が事前実行された状態で配布され、

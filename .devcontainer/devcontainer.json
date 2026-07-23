@@ -6,11 +6,14 @@
 {
   "name": "RST AI Seminar",
 
-  // GitHub Codespaces の既定イメージ系列。Node / Python など主要ランタイム同梱。
-  // 万一この tag が引けない場合は、次のいずれかに差し替える:
-  //   "mcr.microsoft.com/devcontainers/universal:linux"      (ローリング最新)
-  //   "mcr.microsoft.com/devcontainers/javascript-node:1-20" (軽量・Nodeのみ)
-  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  // Node 22 系の devcontainer イメージ。
+  // claude-code が Node>=22 を要求するため、Node 22 を確定的に積むこのイメージを使う。
+  // （universal:2 は既定 Node が 20 で、npm install 時に EBADENGINE 警告が出るため不採用。
+  //   tag 自体は pull 可能。経緯は HANDOFF.md の 2-6 / 6 を参照）
+  // 万一この tag が引けない場合は、Node 22 を積む別イメージに差し替える（Node 22 未満に落とさないこと）:
+  //   "mcr.microsoft.com/devcontainers/javascript-node:22"   (同等・タグ違い)
+  //   "mcr.microsoft.com/devcontainers/typescript-node:1-22" (同等＋TypeScript同梱)
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22",
 
   // onCreateCommand は Prebuild に取り込まれる。
   // Prebuild を有効化すると、この npm install が事前に済んだ状態で配布できる。
