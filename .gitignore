@@ -1,0 +1,14 @@
+node_modules/
+
+# 認証情報 — 絶対にコミットしない
+.env
+.env.*
+*.pem
+*.key
+secrets.json
+.claude/settings.local.json
+
+# エディタ / OS
+.DS_Store
+*.log
+.vscode/settings.json

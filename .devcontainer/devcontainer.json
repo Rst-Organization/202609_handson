@@ -1,0 +1,46 @@
+// RST AIセミナー ハンズオン環境
+// 設計方針: 壊れる可能性のある指定を極力書かない
+//   - remoteUser を書かない       → イメージ既定のユーザーを使う（$HOME 不一致事故を防ぐ）
+//   - hostRequirements を書かない → 無料枠のマシンで確保できずに詰まるのを防ぐ
+//   - features を使わない         → ビルド時間と失敗要因を増やさない
+{
+  "name": "RST AI Seminar",
+
+  // GitHub Codespaces の既定イメージ系列。Node / Python など主要ランタイム同梱。
+  // 万一この tag が引けない場合は、次のいずれかに差し替える:
+  //   "mcr.microsoft.com/devcontainers/universal:linux"      (ローリング最新)
+  //   "mcr.microsoft.com/devcontainers/javascript-node:1-20" (軽量・Nodeのみ)
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+
+  // onCreateCommand は Prebuild に取り込まれる。
+  // Prebuild を有効化すると、この npm install が事前に済んだ状態で配布できる。
+  "onCreateCommand": "bash .devcontainer/bootstrap.sh",
+
+  // 接続のたびに状態を表示。失敗してもコンテナは落とさない。
+  "postAttachCommand": "bash scripts/doctor.sh || true",
+
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": {
+      "label": "Task API",
+      "onAutoForward": "silent"
+    }
+  },
+
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "files.eol": "\n",
+        "editor.formatOnSave": false
+      },
+      "extensions": [
+        "dbaeumer.vscode-eslint"
+      ]
+      // 注意: Claude Code の VS Code 拡張 "anthropic.claude-code" はあえて入れていない。
+      // 拡張は既定で Anthropic アカウントへのログインを促すため、
+      // APIキー運用の本セミナーでは受講生が「サインインを求められて詰まる」事故が起きる。
+      // CLI（claude コマンド）で統一する。詳細は docs/operator-guide.md
+    }
+  }
+}

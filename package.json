@@ -1,0 +1,20 @@
+{
+  "name": "rst-ai-seminar",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "RST AIセミナー用ハンズオン環境（Codespaces + Claude Code）",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "setup": "bash scripts/setup-key.sh",
+    "doctor": "bash scripts/doctor.sh",
+    "test": "node --test test/*.test.js",
+    "start": "node src/server.js",
+    "claude": "claude"
+  },
+  "devDependencies": {
+    "@anthropic-ai/claude-code": "latest"
+  }
+}
