@@ -109,6 +109,36 @@ Node 20 の環境では `npm install` 時に **EBADENGINE 警告**が出る
   不採用の理由は Node バージョンのみ。
 → イメージを差し替える場合も **Node 22 未満には落とさないこと**。
 
+### 2-7. Codespaces で HTML をプレビューする手段（2026-09-07 追記）
+
+**Live Server 系の VS Code 拡張は使えない。** 調査で確定した事実:
+
+- `ritwickdey.LiveServer` は**構造的に動かない**。ブラウザ起動に npm の `opn` を
+  直接呼んでおり（`src/appModel.ts`）、`vscode.env.asExternalUri` を一切使っていない。
+  拡張はコンテナ側で動くため `xdg-open` を叩くだけで、参加者のブラウザには何も起きない。
+  `http://127.0.0.1:5500` が `https://<codespace>-5500.app.github.dev` に変換されない。
+  （Issue #1054 / #2740 / #1375。最終更新も 2022→2026 で3年半空いている）
+- Microsoft 公式 `ms-vscode.live-server` は `asExternalUri` を使うので転送自体は正しいが、
+  **埋め込みプレビュー（iframe）が Codespaces の private ポートで 401 になる**。
+  GitHub 認証のリダイレクトが iframe 内で完結できないため（Issue #111、2021年から Open）。
+- 同じ理由で `portsAttributes` の `onAutoForward: "openPreview"`（VS Code 内蔵ブラウザ）
+  も避ける。**実ブラウザのタブ = トップレベル遷移なら認証が通る**ので `notify` を使い、
+  参加者に通知の「ブラウザーで開く」を押させる。
+
+→ **拡張を足さず、`preview.py`（標準ライブラリのみ）でサーバーを立てる方式を採用した。**
+  拡張を増やさないので、HANDOFF 4 の「ビルド失敗要因を増やさない」方針とも整合する。
+
+**`python3` はイメージに存在する**（実測: `docker run mcr.microsoft.com/devcontainers/javascript-node:1-22
+python3 --version` → `Python 3.11.2`）。ただし `python`（無印）と `pip` は**無い**ので、
+必ず `python3` と書くこと。なお python3 は base の `node:22-bookworm` からの推移的依存
+（`mercurial` 経由）で入っており、`bookworm-slim` 系には無い。
+**イメージを slim 系に変えると `preview.py` が動かなくなる。**
+
+ポート自動転送は言語非依存（VS Code 本体の `remoteExplorer.ts` がプロセスと
+ターミナル出力の両方を監視する）。`preview.py` が起動時に
+`http://localhost:3000/` を print しているのは、この出力ベース検知に確実に乗せるため。
+**この print 行を消さないこと。**
+
 ---
 
 ## 3. キー運用モデル
@@ -140,6 +170,9 @@ Node 20 の環境では `npm install` 時に **EBADENGINE 警告**が出る
 | `hostRequirements` | **書かない** | 無料枠のマシンで要求スペックを確保できず、起動が失敗しうる |
 | devcontainer `features` | **使わない** | ビルド時間と失敗要因が増える |
 | VS Code 拡張 `anthropic.claude-code` | **入れない** | ログインを要求して参加者が止まる（2-4 参照） |
+| VS Code 拡張 `ritwickdey.LiveServer` | **入れない** | Codespaces で構造的に動かない（2-7 参照） |
+| VS Code 拡張 `ms-vscode.live-server` | **入れない** | 埋め込みプレビューが Codespaces で 401 になる（2-7 参照） |
+| `portsAttributes.3000.onAutoForward` | **`notify` を維持** | `silent` だと通知が出ずプレビューに気づけない。`openPreview` は iframe 認証で 401（2-7 参照） |
 | 外部 npm パッケージ | **追加しない** | 会場のネットワークで `npm install` が失敗すると全員止まる。現在ランタイム依存ゼロ |
 | API キーのリポジトリ内配置 | **絶対禁止** | Public リポジトリ。Google Drive 経由も同様に禁止 |
 
@@ -165,20 +198,39 @@ Node 20 の環境では `npm install` 時に **EBADENGINE 警告**が出る
 scripts/
   setup-key.sh         APIキーを rc に書き込む。リポジトリには書かない
   doctor.sh            環境診断。詰まったらまずこれ
-src/
-  server.js            HTTPサーバー（node:http のみ）
-  store.js             タスクのインメモリ保管
-  validate.js          入力バリデーション
-test/
-  store.test.js        7件、全パス
-  validate.test.js     7件、うち1件が意図的に失敗
+  reset-claude.sh      claude 初回セットアップのやり直し（~/.claude.json を削除）
+preview.py             apps/ を 3000 番で配信。標準ライブラリのみ
+apps/                  参加者の成果物（HTML）の置き場所
+.claude/
+  settings.json        モデル固定（sonnet）と権限
+  skills/
+    work-idea-hearing/     ステップ5: ヒアリング → アイデア提案
+    vibe-app-builder/      ステップ6: 見た目ヒアリング → 実装
+src/                   【旧トラック】タスク管理API。現行の流れでは使わない
+test/                  【旧トラック】うち1件が意図的に失敗
 docs/
-  exercises.md         参加者向け演習1〜4
+  exercises.md         【旧トラック】エンジニア向け演習1〜4。README からは外した
   operator-guide.md    運営向け。事前準備・当日運用・キー失効手順
 CLAUDE.md              @AGENTS.md を import するだけ
 AGENTS.md              AI向けプロジェクト説明書（実体はこちら）
-README.md              参加者向け。3ステップのセットアップ手順
+README.md              参加者向け。準備〜ステップ8まで全部
 ```
+
+### 現行のセミナーの流れ（2026-09-07 時点）
+
+**skills を使う流れが本線。** `src/` のタスク管理API 演習は旧トラック。
+
+```
+ステップ1〜4  準備（Codespace 作成 → キー設定 → doctor → claude 初回起動）
+ステップ5     /work-idea-hearing   ヒアリング → アイデア3〜5個 → 1つ選ぶ
+ステップ6     /vibe-app-builder    見た目ヒアリング → apps/ に HTML を実装
+ステップ7     python3 preview.py   自分のブラウザで動作確認
+ステップ8     見せあいっこ
+```
+
+README ではこれを「現場の要件定義プロセス（ヒアリング→要件定義→設計→実装→動作確認）を
+AIと分担してやる体験」としてフレーミングしている。運営はこの説明を
+Codespace 起動待ちの1〜3分で話す想定。
 
 ### 意図的に失敗するテストがある
 
@@ -247,6 +299,16 @@ README.md              参加者向け。3ステップのセットアップ手�
    `onCreateCommand`（= `npm install`）が事前実行された状態で配布され、
    起動が数分 → 数十秒になる。**オンボ時間短縮に最も効く**
 3. `README.md` 内のリンクを実際のリポジトリURLに合わせる
+4. **`claude` 初回起動の質問文言を実機で確認し、README ステップ4の表を差し替える**
+   現在の表は「何を聞かれるか・どちらを選ぶか・間違えた時の症状」で書いてあり、
+   文言が変わっても壊れないようにはしてあるが、**英語原文は未確認**。
+   claude CLI がネイティブバイナリ配布になっておりローカルから文字列を抽出できなかった。
+   → 検証 Codespace で実際に `claude` を初回起動し、**各画面のスクリーンショットを撮って
+     README に貼る**のが最も親切。質問の順番もそこで確定させること。
+5. **`preview.py` を実 Codespaces で通す**
+   ローカル Docker では python3 の存在と `http.server` の動作を確認済みだが、
+   「3000 番が転送されて右下に通知が出る → ブラウザーで開くで実際に見える」までは
+   実 Codespaces でのみ確認できる。**ここが落ちるとステップ7が全滅する。**
 
 ### 任意
 

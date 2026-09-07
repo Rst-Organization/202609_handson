@@ -10,6 +10,8 @@
   "scripts": {
     "setup": "bash scripts/setup-key.sh",
     "doctor": "bash scripts/doctor.sh",
+    "preview": "python3 preview.py",
+    "reset-claude": "bash scripts/reset-claude.sh",
     "test": "node --test test/*.test.js",
     "start": "node src/server.js",
     "claude": "claude"
