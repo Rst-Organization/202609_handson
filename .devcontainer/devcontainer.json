@@ -22,11 +22,20 @@
   // 接続のたびに状態を表示。失敗してもコンテナは落とさない。
   "postAttachCommand": "bash scripts/doctor.sh || true",
 
+  // 3000 は preview.py（作ったアプリのプレビュー）が使う。
+  // forwardPorts に書いたポートはコンテナ起動時に無条件で転送されるため、
+  // 自動検知の成否に依存せず確実にブラウザから開ける。
   "forwardPorts": [3000],
   "portsAttributes": {
     "3000": {
-      "label": "Task API",
-      "onAutoForward": "silent"
+      "label": "アプリのプレビュー",
+      // "notify" = 右下に「ブラウザーで開く」の通知を出す。受講生はこれを押す。
+      //   - "silent"      は通知が出ず、受講生がプレビューに気づけない（旧設定）
+      //   - "openPreview" はエディタ内蔵ブラウザ（iframe）で開くが、Codespaces の
+      //     private ポートは GitHub 認証のリダイレクトが iframe 内で完結できず
+      //     401 になる既知の問題があるため使わない。
+      //     実ブラウザのタブ（トップレベル遷移）なら認証が正常に通る。
+      "onAutoForward": "notify"
     }
   },
 

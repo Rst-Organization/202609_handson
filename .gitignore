@@ -12,3 +12,4 @@ secrets.json
 .DS_Store
 *.log
 .vscode/settings.json
+__pycache__/
